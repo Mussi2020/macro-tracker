@@ -1,0 +1,56 @@
+name: 宏观指标每日更新
+
+# 触发：每天 01:00 UTC（= 北京 09:00）自动跑；也可在 Actions 页面手动触发。
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch: {}
+
+# 需要写回仓库（提交更新后的 xlsx / 缓存），给默认 GITHUB_TOKEN 写权限。
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      # 这两个 secret 需你在仓库 Settings → Secrets 里配置：
+      #   CLOUDFLARE_API_TOKEN  = cf_config.json 里的 token
+      #   CLOUDFLARE_ACCOUNT_ID = cf_config.json 里的 account_id
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # 让 update_macro.py 跳过其内部部署（由下面的 wrangler 步骤负责）
+      GITHUB_ACTIONS: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Run update (fetch data + rebuild xlsx/html)
+        run: python update_macro.py
+
+      - name: Prepare Cloudflare deploy dir
+        run: |
+          mkdir -p site
+          cp "宏观趋势图.html" site/index.html
+
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler@latest pages deploy site --project-name macro-dashboard --branch main --yes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Commit updated data back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add 宏观指标跟踪.xlsx 宏观趋势图.html fred_cache.json .cape.xls cape_manual.csv
+          git diff --cached --quiet || git commit -m "chore: daily data update $(date +'%Y-%m-%d')"
+          git push

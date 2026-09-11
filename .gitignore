@@ -1,0 +1,24 @@
+# ---- 本地敏感/环境文件，不入库 ----
+# 含 Cloudflare API 令牌，改用 GitHub Secrets 注入
+cf_config.json
+# Python 依赖（CI 里用 pip 安装）
+.pylibs/
+# wrangler 本地状态
+.wrangler/
+# Excel 自动备份
+backups/
+__pycache__/
+# 运行日志
+update.log
+node_modules/
+
+# ---- 需入库以保留历史与缓存（此处仅为说明，不要加 # 行内注释）----
+# 宏观指标跟踪.xlsx
+# 宏观趋势图.html
+# fred_cache.json
+# .cape.xls
+# cape_manual.csv
+
+# ---- OS ----
+Thumbs.db
+.DS_Store
